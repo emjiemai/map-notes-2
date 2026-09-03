@@ -1,0 +1,23 @@
+{
+  "name": "test-web-8",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "test": "node --test tests/real.test.js",
+    "sync:android": "cap sync android"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/cli": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/geolocation": "^8.2.2",
+    "cors": "^2.8.6",
+    "express": "^5.2.1"
+  }
+}

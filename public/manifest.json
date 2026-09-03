@@ -1,0 +1,16 @@
+{
+  "name": "Map Notes — Field Visit Logger",
+  "short_name": "Map Notes",
+  "description": "Field visit logging and tamper-proof route tracking for B2B sales teams.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#2563EB",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><rect width='48' height='48' rx='10' fill='%232563EB'/><path d='M24 10 C17.37 10 12 15.37 12 22 C12 30 24 38 24 38 C24 38 36 30 36 22 C36 15.37 30.63 10 24 10 Z' fill='white'/><circle cx='24' cy='22' r='5' fill='%232563EB'/></svg>",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

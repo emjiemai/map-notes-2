@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Map Notes — Field Visit Logger</title>
+  <meta name="description" content="Field-visit logging and tamper-proof route tracking for B2B sales teams.">
+  <meta name="theme-color" content="#2563EB">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><rect width='48' height='48' rx='10' fill='%232563EB'/><circle cx='24' cy='22' r='7' fill='white'/></svg>">
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="brand-wrap" id="headerBrand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+      </div>
+      <span class="brand-title">Map Notes</span>
+    </div>
+
+    <!-- Active Route Tracker Status Badge -->
+    <div class="header-center">
+      <div id="trackerStatusBadge" class="tracker-status-badge" title="Click to view shift hours and battery settings">
+        <span class="tracker-dot"></span>
+        <span id="trackerStatusText">Tracking Inactive</span>
+      </div>
+    </div>
+
+    <!-- User Profile & Session -->
+    <div class="header-actions">
+      <div id="userProfileBtn" class="user-profile-btn" title="View profile & switch sales rep">
+        <div id="userAvatarMini" class="user-avatar-mini" style="background-color: #2563EB;">U</div>
+        <span id="userNameLabel" class="user-name-label">Sign In</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Category Filter Bar (Hotel / Medical / Restaurant / Other / All) -->
+  <nav class="category-filter-bar" aria-label="Category filters">
+    <button class="cat-pill active" data-cat="All">All Pins</button>
+    <button class="cat-pill" data-cat="Hotel">🏨 Hotels</button>
+    <button class="cat-pill" data-cat="Medical">🏥 Medical</button>
+    <button class="cat-pill" data-cat="Restaurant">🍽️ Restaurants</button>
+    <button class="cat-pill" data-cat="Other">🏢 Other</button>
+  </nav>
+
+  <!-- Map Container -->
+  <div id="mapView"></div>
+
+  <!-- Floating Bottom Controls -->
+  <div class="floating-bottom-bar">
+    <button id="openLogVisitBtn" class="btn-primary-action">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+      <span>Log Visit</span>
+    </button>
+
+    <button id="openRouteAuditorBtn" class="btn-secondary-action" title="Day-by-day Route Auditor for Travel Reimbursement">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>
+    </button>
+
+    <button id="openTeamsBtn" class="btn-secondary-action" title="Manage Teams & Unanimous Deletion Consensus">
+      <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+    </button>
+
+    <button id="openBatteryGuideBtn" class="btn-secondary-action" title="Background GPS & Battery Optimization Guide">
+      <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4zM11 20v-5.5H9L13 7v5.5h2L11 20z"/></svg>
+    </button>
+  </div>
+
+  <!-- Slide-Over Bottom Sheet: Place Details & History -->
+  <aside id="placeDetailSheet" class="bottom-sheet-panel">
+    <div class="sheet-drag-handle"></div>
+    <div class="sheet-header">
+      <div>
+        <h3 id="sheetPlaceName" class="sheet-place-name">Place Details</h3>
+        <div class="sheet-sub-row">
+          <span id="sheetCategoryBadge" class="category-tag tag-hotel">Hotel</span>
+          <span id="sheetCoords" class="sheet-coords">40.7580, -73.9855</span>
+          <span id="sheetVisitCount" style="font-size: 0.75rem; color: #64748B;">1 visit</span>
+        </div>
+      </div>
+      <button id="closeSheetBtn" class="sheet-close-btn" aria-label="Close sheet">×</button>
+    </div>
+
+    <div class="sheet-body">
+      <!-- Add Follow-up Visit Form -->
+      <form id="addFollowUpForm" class="add-comment-box">
+        <span style="font-size: 0.8rem; font-weight: 700; color: #475569; text-transform: uppercase;">Add Follow-Up Log to this Place</span>
+        <textarea id="followUpNote" placeholder="Enter follow-up sales notes, deal updates, contacts met..."></textarea>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <input type="file" id="followUpPhoto" accept="image/*" style="font-size: 0.75rem; max-width: 170px;">
+          <button type="submit" class="btn-sm btn-primary-action" style="padding: 6px 14px; font-size: 0.8rem;">
+            Save Log
+          </button>
+        </div>
+      </form>
+
+      <!-- Complete Chronological History -->
+      <div style="font-size: 0.8rem; font-weight: 700; color: #64748B; text-transform: uppercase;">
+        Complete Visit Timeline (Exact Timestamps)
+      </div>
+      <div id="sheetVisitsList" class="visits-timeline-list">
+        <!-- Populated via js/map.js -->
+      </div>
+    </div>
+  </aside>
+
+  <!-- Modal 1: Log a Visit (with GPS & 50m Duplicate Detection) -->
+  <div id="logVisitModal" class="modal-overlay">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3 class="modal-title">Log Field Visit</h3>
+        <button class="sheet-close-btn modal-close-trigger">×</button>
+      </div>
+      <div class="modal-body">
+        <!-- Location Picker Header -->
+        <div style="display: flex; gap: 0.5rem;">
+          <button id="useCurrentLocationBtn" class="btn-sm btn-outline" style="flex: 1; padding: 8px;">
+            📍 My Current GPS
+          </button>
+          <button id="pickOnMapBtn" class="btn-sm btn-outline" style="flex: 1; padding: 8px;">
+            🗺️ Pick Location on Map
+          </button>
+        </div>
+
+        <div style="font-size: 0.75rem; color: #64748B;">
+          Coordinates: <strong id="visitLocationDisplay">Acquiring GPS...</strong>
+        </div>
+
+        <!-- 50m Duplicate Alert Banner -->
+        <div id="duplicateAlertBanner" class="duplicate-alert-banner">
+          <!-- Populated if within 50m of an existing place -->
+        </div>
+
+        <form id="logVisitForm" style="display: flex; flex-direction: column; gap: 1rem;">
+          <div class="form-group">
+            <label for="visitPlaceName">Place / Business Name</label>
+            <input type="text" id="visitPlaceName" class="form-control" placeholder="e.g. Grand Plaza Hotel" required>
+          </div>
+
+          <div class="form-group">
+            <label for="visitCategory">Category</label>
+            <select id="visitCategory" class="form-control">
+              <option value="Hotel">Hotel</option>
+              <option value="Medical">Medical Facility</option>
+              <option value="Restaurant">Restaurant</option>
+              <option value="Other">Other / Corporate</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="visitNote">Sales Notes / Meeting Summary</label>
+            <textarea id="visitNote" class="form-control" rows="3" placeholder="Key decision maker met, interest level, follow-up date..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="visitPhoto">Attach Photo (Optional)</label>
+            <input type="file" id="visitPhoto" accept="image/*" class="form-control" style="padding: 4px;">
+          </div>
+
+          <div style="margin-top: 0.5rem;">
+            <button type="submit" id="submitVisitBtn" class="btn-primary-action" style="width: 100%; justify-content: center;">
+              Confirm & Save Visit
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Day-by-Day Route Auditor (Reimbursement Verification) -->
+  <div id="routeAuditorModal" class="modal-overlay">
+    <div class="modal-window" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Route Auditor & Travel Reimbursement</h3>
+        <button class="sheet-close-btn modal-close-trigger">×</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: #475569;">
+          Tamper-proof travel trails recorded during working hours (11:00–16:00). Immutable data for honest mileage calculation.
+        </p>
+
+        <!-- Selector Row -->
+        <div class="route-auditor-controls">
+          <div class="form-group">
+            <label for="routeRepSelect">Sales Representative</label>
+            <select id="routeRepSelect" class="form-control">
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="routeDateInput">Travel Date</label>
+            <input type="date" id="routeDateInput" class="form-control">
+          </div>
+        </div>
+
+        <button id="loadRouteBtn" class="btn-sm btn-primary-action" style="width: 100%; justify-content: center; padding: 10px;">
+          View Route on Map
+        </button>
+
+        <!-- Mileage Stats Card -->
+        <div class="route-stats-card">
+          <div>
+            <div id="routeTotalKm" class="stat-metric-val">0.00 km</div>
+            <div id="routeTotalMiles" style="font-size: 0.85rem; color: #64748B; font-weight: 600;">0.00 miles</div>
+            <div class="stat-metric-lbl">Audited Distance</div>
+          </div>
+          <div>
+            <div id="routePointCount" class="stat-metric-val">0</div>
+            <div id="routeSegmentCount" style="font-size: 0.85rem; color: #64748B; font-weight: 600;">0 segments</div>
+            <div class="stat-metric-lbl">Movement Points</div>
+          </div>
+        </div>
+
+        <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 6px; padding: 0.75rem; font-size: 0.78rem; color: #1E40AF;">
+          ℹ️ <strong>Gap Break Rule:</strong> Consecutive points &gt;30m apart are not connected by straight lines to prevent false distance inflation. Time labels are placed every ~10 minutes.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Teams & Unanimous Deletion Consensus -->
+  <div id="teamsModal" class="modal-overlay">
+    <div class="modal-window">
+      <div class="modal-header">
+        <h3 class="modal-title">Sales Teams</h3>
+        <button class="sheet-close-btn modal-close-trigger">×</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: #475569;">
+          Teams share all pins and visit histories. Deleting a team requires <strong>unanimous agreement</strong> from every active member.
+        </p>
+
+        <div id="teamsList" class="teams-list-wrap">
+          <!-- Populated via js/teams.js -->
+        </div>
+
+        <!-- Create Team Form -->
+        <form id="createTeamForm" style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+          <input type="text" id="newTeamName" class="form-control" placeholder="New team name..." required>
+          <button type="submit" class="btn-sm btn-primary-action" style="white-space: nowrap;">Create Team</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 4: Friction-Free Auth (Name + PIN Only) -->
+  <div id="authModal" class="modal-overlay">
+    <div class="modal-window" style="max-width: 420px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Sign In to Map Notes</h3>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: #475569;">
+          Friction-free identity for your sales team. No email or SMS required. Re-entering your Name and PIN always restores your exact account even after clearing cache or reinstalling.
+        </p>
+
+        <form id="authForm" style="display: flex; flex-direction: column; gap: 1rem;">
+          <div class="form-group">
+            <label for="authName">Your Full Name</label>
+            <input type="text" id="authName" class="form-control" placeholder="e.g. Marcus Vance" required>
+          </div>
+
+          <div class="form-group">
+            <label for="authPin">4-Digit Security PIN</label>
+            <input type="password" id="authPin" class="form-control" placeholder="e.g. 4821" maxlength="8" required>
+          </div>
+
+          <button type="submit" class="btn-primary-action" style="width: 100%; justify-content: center; padding: 10px; margin-top: 0.5rem;">
+            Continue to Field Map
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 5: Battery Optimization & Background Tracking Guide -->
+  <div id="batteryGuideModal" class="modal-overlay">
+    <div class="modal-window" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Background Tracking & Battery Guide</h3>
+        <button class="sheet-close-btn modal-close-trigger">×</button>
+      </div>
+      <div class="modal-body" style="font-size: 0.85rem; line-height: 1.6; color: #334155;">
+        <h4 style="font-size: 0.95rem; color: #0F172A; margin-bottom: 4px;">Why Background Tracking Needs Attention</h4>
+        <p>
+          Mobile operating systems (Android & iOS) aggressively terminate background processes to save battery. To ensure your travel route is honestly recorded for reimbursement:
+        </p>
+
+        <div style="background: #F8FAFC; border-left: 3px solid #2563EB; padding: 0.75rem 1rem; margin: 0.75rem 0;">
+          <strong>🤖 Android Devices:</strong>
+          <ol style="margin-left: 1.2rem; margin-top: 4px;">
+            <li>Go to <em>Settings &gt; Apps &gt; Map Notes (or Chrome)</em>.</li>
+            <li>Tap <em>Battery</em> and select <strong>"Unrestricted"</strong> (or disable "Battery Optimization").</li>
+            <li>On Xiaomi/Samsung: Enable "Autostart" and lock the app in the recent apps tray.</li>
+          </ol>
+        </div>
+
+        <div style="background: #F8FAFC; border-left: 3px solid #10B981; padding: 0.75rem 1rem; margin: 0.75rem 0;">
+          <strong>🍎 iPhone / iOS:</strong>
+          <ol style="margin-left: 1.2rem; margin-top: 4px;">
+            <li>In Safari, tap the <strong>Share</strong> button and choose <strong>"Add to Home Screen"</strong>.</li>
+            <li>During your shift, keep the app active or enable the built-in <strong>Screen Wake Lock</strong> below so the screen remains on while driving between venues.</li>
+          </ol>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #E2E8F0; padding-top: 1rem; margin-top: 0.5rem;">
+          <span><strong>Screen Wake Lock:</strong> Keep screen awake on shift</span>
+          <button id="toggleWakeLockBtn" class="btn-sm btn-outline">Enable Wake Lock</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/idb.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/tracker.js"></script>
+  <script src="/js/map.js"></script>
+  <script src="/js/route-viewer.js"></script>
+  <script src="/js/teams.js"></script>
+
+  <!-- Main UI Coordinator -->
+  <script>
+    class MapNotesApp {
+      constructor() {
+        this.routeViewer = null;
+      }
+
+      async start() {
+        // Register Service Worker
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW registration error:', err));
+        }
+
+        // Initialize Map
+        window.mapManager.init('mapView');
+        this.routeViewer = new RouteViewer(window.mapManager.map);
+        this.routeViewer.init();
+
+        // Check Auth
+        if (!window.api.currentUser) {
+          this.openAuthModal();
+        } else {
+          this.updateUserUI();
+          await this.initializeApp();
+        }
+
+        this.bindEvents();
+      }
+
+      async initializeApp() {
+        // Fetch config (shift hours, thresholds)
+        try {
+          const config = await window.api.getConfig();
+          await window.tracker.init(config);
+          window.tracker.start(); // Start route tracking watcher
+        } catch (e) {
+          console.warn('Could not load config:', e);
+          await window.tracker.init();
+          window.tracker.start();
+        }
+
+        // Setup Tracker Status Listener
+        window.tracker.onStatusChange = (isActive, msg) => {
+          const badge = document.getElementById('trackerStatusBadge');
+          const txt = document.getElementById('trackerStatusText');
+          if (badge && txt) {
+            badge.classList.toggle('active', isActive);
+            txt.textContent = msg;
+          }
+        };
+
+        // Load Places & Teams
+        await this.reloadPlaces();
+        await window.teamsManager.loadTeams();
+      }
+
+      async reloadPlaces() {
+        try {
+          const res = await window.api.getPlaces(window.mapManager.activeCategory);
+          window.mapManager.setPlaces(res.places || []);
+        } catch (err) {
+          console.error('Failed to load places:', err);
+        }
+      }
+
+      updateUserUI() {
+        const user = window.api.currentUser;
+        if (!user) return;
+        const avatarEl = document.getElementById('userAvatarMini');
+        const nameEl = document.getElementById('userNameLabel');
+
+        if (avatarEl) {
+          avatarEl.style.backgroundColor = user.avatarColor;
+          avatarEl.textContent = user.avatarInitials;
+        }
+        if (nameEl) {
+          nameEl.textContent = user.name;
+        }
+      }
+
+      openAuthModal() {
+        document.getElementById('authModal').classList.add('active');
+      }
+
+      bindEvents() {
+        // Category Filter Pills
+        const pills = document.querySelectorAll('.cat-pill');
+        pills.forEach(pill => {
+          pill.addEventListener('click', () => {
+            pills.forEach(p => p.classList.remove('active'));
+            pill.classList.add('active');
+            const cat = pill.dataset.cat;
+            window.mapManager.setCategoryFilter(cat);
+            this.reloadPlaces();
+          });
+        });
+
+        // Close Place Sheet
+        const closeSheetBtn = document.getElementById('closeSheetBtn');
+        if (closeSheetBtn) {
+          closeSheetBtn.addEventListener('click', () => {
+            document.getElementById('placeDetailSheet').classList.remove('active');
+          });
+        }
+
+        // Open Log Visit Modal
+        const openLogBtn = document.getElementById('openLogVisitBtn');
+        if (openLogBtn) {
+          openLogBtn.addEventListener('click', () => {
+            this.openLogVisitModal();
+          });
+        }
+
+        // GPS Location Button in Log Visit Modal
+        const gpsBtn = document.getElementById('useCurrentLocationBtn');
+        if (gpsBtn) {
+          gpsBtn.addEventListener('click', () => {
+            if ('geolocation' in navigator) {
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  window.mapManager.setLocationForVisit(pos.coords.latitude, pos.coords.longitude);
+                  window.mapManager.map.setView([pos.coords.latitude, pos.coords.longitude], 16);
+                },
+                (err) => alert('GPS location failed: ' + err.message),
+                { enableHighAccuracy: true }
+              );
+            }
+          });
+        }
+
+        // Pick on Map Button in Log Visit Modal
+        const pickMapBtn = document.getElementById('pickOnMapBtn');
+        if (pickMapBtn) {
+          pickMapBtn.addEventListener('click', () => {
+            alert('Tap anywhere on the map to set the visit coordinates. Close this modal to inspect the map.');
+          });
+        }
+
+        // Log Visit Form Submit
+        const logVisitForm = document.getElementById('logVisitForm');
+        if (logVisitForm) {
+          logVisitForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!window.mapManager.pendingLocation) {
+              alert('Please select a location via GPS or by tapping the map.');
+              return;
+            }
+
+            const name = document.getElementById('visitPlaceName').value;
+            const category = document.getElementById('visitCategory').value;
+            const note = document.getElementById('visitNote').value;
+            const photoInput = document.getElementById('visitPhoto');
+
+            let photoData = null;
+            if (photoInput && photoInput.files && photoInput.files[0]) {
+              photoData = await this.fileToBase64(photoInput.files[0]);
+            }
+
+            try {
+              const res = await window.api.logVisit({
+                placeName: name,
+                category,
+                lat: window.mapManager.pendingLocation.lat,
+                lng: window.mapManager.pendingLocation.lng,
+                note,
+                photoData
+              });
+
+              document.getElementById('logVisitModal').classList.remove('active');
+              logVisitForm.reset();
+
+              if (res.attachedToExisting) {
+                alert(`Nearby place found (${res.distanceMeters}m away). Attached your visit to "${res.place.name}" without creating a duplicate pin!`);
+              } else {
+                alert(`New place created and visit logged successfully!`);
+              }
+
+              await this.reloadPlaces();
+              window.mapManager.openPlaceDetails(res.place);
+            } catch (err) {
+              alert('Failed to save visit: ' + err.message);
+            }
+          });
+        }
+
+        // Follow-Up Note Submit from Place Detail Sheet
+        const followUpForm = document.getElementById('addFollowUpForm');
+        if (followUpForm) {
+          followUpForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const place = window.mapManager.selectedPlace;
+            if (!place) return;
+
+            const note = document.getElementById('followUpNote').value;
+            const photoInput = document.getElementById('followUpPhoto');
+
+            let photoData = null;
+            if (photoInput && photoInput.files && photoInput.files[0]) {
+              photoData = await this.fileToBase64(photoInput.files[0]);
+            }
+
+            try {
+              const res = await window.api.logVisit({
+                placeName: place.name,
+                category: place.category,
+                lat: place.lat,
+                lng: place.lng,
+                note,
+                photoData
+              });
+
+              followUpForm.reset();
+              await this.reloadPlaces();
+              window.mapManager.openPlaceDetails(res.place);
+            } catch (err) {
+              alert('Failed to add follow-up log: ' + err.message);
+            }
+          });
+        }
+
+        // Route Auditor Open Button
+        const openRouteAuditorBtn = document.getElementById('openRouteAuditorBtn');
+        if (openRouteAuditorBtn) {
+          openRouteAuditorBtn.addEventListener('click', async () => {
+            await this.populateRepsDropdown();
+            // Set date to today YYYY-MM-DD
+            const todayStr = new Date().toISOString().split('T')[0];
+            document.getElementById('routeDateInput').value = todayStr;
+            document.getElementById('routeAuditorModal').classList.add('active');
+          });
+        }
+
+        // Load Route on Map
+        const loadRouteBtn = document.getElementById('loadRouteBtn');
+        if (loadRouteBtn) {
+          loadRouteBtn.addEventListener('click', async () => {
+            const repId = document.getElementById('routeRepSelect').value;
+            const dateStr = document.getElementById('routeDateInput').value;
+
+            if (!repId || !dateStr) {
+              alert('Please select both a sales rep and date.');
+              return;
+            }
+
+            try {
+              const res = await window.api.getRoutes(repId, dateStr);
+              const stats = this.routeViewer.renderRoute(res.points);
+
+              document.getElementById('routeTotalKm').textContent = `${stats.totalDistanceKm} km`;
+              document.getElementById('routeTotalMiles').textContent = `${stats.totalDistanceMiles} miles`;
+              document.getElementById('routePointCount').textContent = stats.pointCount;
+              document.getElementById('routeSegmentCount').textContent = `${stats.segmentsCount} segments`;
+
+              document.getElementById('routeAuditorModal').classList.remove('active');
+              alert(`Route rendered for ${dateStr}. Audited distance: ${stats.totalDistanceKm} km (${stats.totalDistanceMiles} mi). Check the map trail!`);
+            } catch (err) {
+              alert('Failed to load route: ' + err.message);
+            }
+          });
+        }
+
+        // Teams Modal Button
+        const openTeamsBtn = document.getElementById('openTeamsBtn');
+        if (openTeamsBtn) {
+          openTeamsBtn.addEventListener('click', async () => {
+            await window.teamsManager.loadTeams();
+            document.getElementById('teamsModal').classList.add('active');
+          });
+        }
+
+        // Create Team Form
+        const createTeamForm = document.getElementById('createTeamForm');
+        if (createTeamForm) {
+          createTeamForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('newTeamName').value;
+            if (!name) return;
+
+            try {
+              await window.api.createTeam(name);
+              document.getElementById('newTeamName').value = '';
+              await window.teamsManager.loadTeams();
+            } catch (err) {
+              alert('Failed to create team: ' + err.message);
+            }
+          });
+        }
+
+        // Battery Guide Modal Button
+        const openBatteryBtn = document.getElementById('openBatteryGuideBtn');
+        if (openBatteryBtn) {
+          openBatteryBtn.addEventListener('click', () => {
+            document.getElementById('batteryGuideModal').classList.add('active');
+          });
+        }
+
+        // Wake Lock Toggle Button
+        const toggleWakeLockBtn = document.getElementById('toggleWakeLockBtn');
+        if (toggleWakeLockBtn) {
+          toggleWakeLockBtn.addEventListener('click', async () => {
+            if (window.tracker.wakeLock) {
+              window.tracker.releaseWakeLock();
+              toggleWakeLockBtn.textContent = 'Enable Wake Lock';
+              toggleWakeLockBtn.classList.remove('btn-danger');
+            } else {
+              await window.tracker.requestWakeLock();
+              toggleWakeLockBtn.textContent = 'Disable Wake Lock (Active)';
+              toggleWakeLockBtn.classList.add('btn-danger');
+            }
+          });
+        }
+
+        // Auth Form Submit
+        const authForm = document.getElementById('authForm');
+        if (authForm) {
+          authForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('authName').value;
+            const pin = document.getElementById('authPin').value;
+
+            try {
+              await window.api.login(name, pin);
+              document.getElementById('authModal').classList.remove('active');
+              this.updateUserUI();
+              await this.initializeApp();
+            } catch (err) {
+              alert('Sign In Failed: ' + err.message);
+            }
+          });
+        }
+
+        // Switch Rep / Sign Out
+        const userProfileBtn = document.getElementById('userProfileBtn');
+        if (userProfileBtn) {
+          userProfileBtn.addEventListener('click', () => {
+            if (confirm(`Signed in as ${window.api.currentUser.name}. Do you want to sign out or switch accounts?`)) {
+              window.api.logout();
+            }
+          });
+        }
+
+        // Generic Modal Close Triggers
+        const closeTriggers = document.querySelectorAll('.modal-close-trigger');
+        closeTriggers.forEach(btn => {
+          btn.addEventListener('click', () => {
+            document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+          });
+        });
+
+        // Click outside modal to close
+        document.querySelectorAll('.modal-overlay').forEach(modal => {
+          modal.addEventListener('click', (e) => {
+            if (e.target === modal && modal.id !== 'authModal') {
+              modal.classList.remove('active');
+            }
+          });
+        });
+      }
+
+      openLogVisitModal() {
+        const modal = document.getElementById('logVisitModal');
+        modal.classList.add('active');
+
+        // Trigger immediate GPS lookup
+        if ('geolocation' in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              window.mapManager.setLocationForVisit(pos.coords.latitude, pos.coords.longitude);
+            },
+            (err) => {
+              const center = window.mapManager.map.getCenter();
+              window.mapManager.setLocationForVisit(center.lat, center.lng);
+            },
+            { enableHighAccuracy: true, timeout: 6000 }
+          );
+        }
+      }
+
+      async populateRepsDropdown() {
+        const select = document.getElementById('routeRepSelect');
+        if (!select) return;
+        select.innerHTML = '';
+
+        try {
+          const res = await window.api.getReps();
+          const currentUserId = window.api.currentUser ? window.api.currentUser.id : null;
+
+          res.reps.forEach(rep => {
+            const opt = document.createElement('option');
+            opt.value = rep.id;
+            opt.textContent = rep.name + (rep.id === currentUserId ? ' (You)' : '');
+            if (rep.id === currentUserId) opt.selected = true;
+            select.appendChild(opt);
+          });
+        } catch (err) {
+          console.warn('Could not populate reps list:', err);
+        }
+      }
+
+      fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = error => reject(error);
+          reader.readAsDataURL(file);
+        });
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      window.mapNotesApp = new MapNotesApp();
+      window.mapNotesApp.start();
+    });
+  </script>
+</body>
+</html>

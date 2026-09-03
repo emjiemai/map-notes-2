@@ -55,6 +55,30 @@
   <!-- Map Container -->
   <div id="mapView"></div>
 
+  <!-- Floating Locate Me (GPS) Button -->
+  <button id="locateMeBtn" class="locate-me-btn" title="Center Map on My Real Location">
+    <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+  </button>
+
+  <!-- Center Screen Pinning Crosshair -->
+  <div id="mapCenterCrosshair" class="map-center-crosshair">
+    <div class="crosshair-pin-badge">🎯 Move map to position target pin</div>
+    <div class="crosshair-icon-wrap">
+      <svg viewBox="0 0 36 42" width="36" height="42">
+        <path d="M18 0 C8 0 0 8 0 18 C0 30 18 42 18 42 C18 42 36 30 36 18 C36 8 28 0 18 0 Z" fill="#2563EB"/>
+        <circle cx="18" cy="18" r="7" fill="#FFFFFF"/>
+        <circle cx="18" cy="18" r="3" fill="#2563EB"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Floating Confirm Pin Button (when in center-crosshair mode) -->
+  <div id="confirmCenterPinBar" style="position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 1500; display: none;">
+    <button id="confirmCenterPinBtn" class="btn-primary-action" style="box-shadow: 0 8px 20px rgba(0,0,0,0.3);">
+      ✅ Pin This Location
+    </button>
+  </div>
+
   <!-- Floating Bottom Controls -->
   <div class="floating-bottom-bar">
     <button id="openLogVisitBtn" class="btn-primary-action">
@@ -83,7 +107,7 @@
         <h3 id="sheetPlaceName" class="sheet-place-name">Place Details</h3>
         <div class="sheet-sub-row">
           <span id="sheetCategoryBadge" class="category-tag tag-hotel">Hotel</span>
-          <span id="sheetCoords" class="sheet-coords">40.7580, -73.9855</span>
+          <span id="sheetCoords" class="sheet-coords">41.2995, 69.2401</span>
           <span id="sheetVisitCount" style="font-size: 0.75rem; color: #64748B;">1 visit</span>
         </div>
       </div>
@@ -121,18 +145,24 @@
         <button class="sheet-close-btn modal-close-trigger">×</button>
       </div>
       <div class="modal-body">
-        <!-- Location Picker Header -->
-        <div style="display: flex; gap: 0.5rem;">
-          <button id="useCurrentLocationBtn" class="btn-sm btn-outline" style="flex: 1; padding: 8px;">
+        <!-- Location Picker Options -->
+        <label style="font-size: 0.75rem; font-weight: 700; color: #64748B; text-transform: uppercase;">Choose Pinning Mode:</label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+          <button id="useCurrentLocationBtn" type="button" class="btn-sm btn-outline" style="padding: 8px;">
             📍 My Current GPS
           </button>
-          <button id="pickOnMapBtn" class="btn-sm btn-outline" style="flex: 1; padding: 8px;">
-            🗺️ Pick Location on Map
+          <button id="pickCenterOnMapBtn" type="button" class="btn-sm btn-outline" style="padding: 8px;">
+            🎯 Center Pin (Move Map)
           </button>
         </div>
 
+        <!-- Real Human Address Display -->
+        <div id="visitAddressDisplay" class="address-display-box">
+          Acquiring current street address...
+        </div>
+
         <div style="font-size: 0.75rem; color: #64748B;">
-          Coordinates: <strong id="visitLocationDisplay">Acquiring GPS...</strong>
+          Coordinates: <strong id="visitLocationDisplay">41.29950, 69.24010</strong>
         </div>
 
         <!-- 50m Duplicate Alert Banner -->
@@ -313,9 +343,59 @@
           </ol>
         </div>
 
-        <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #E2E8F0; padding-top: 1rem; margin-top: 0.5rem;">
-          <span><strong>Screen Wake Lock:</strong> Keep screen awake on shift</span>
-          <button id="toggleWakeLockBtn" class="btn-sm btn-outline">Enable Wake Lock</button>
+  <!-- Modal 6: Sales Representative Profile & My Pinned Places -->
+  <div id="userProfileModal" class="modal-overlay">
+    <div class="modal-window" style="max-width: 540px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Sales Representative Profile</h3>
+        <button class="sheet-close-btn modal-close-trigger">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="profile-summary-card">
+          <div id="profileLargeAvatar" class="profile-avatar-large">JD</div>
+          <div class="profile-details-wrap">
+            <h4 id="profileRepName">Sales Representative</h4>
+            <p id="profileTeamName">Alpha Sales Team</p>
+            <p id="profilePinDisplay" style="font-family: monospace; font-size: 0.75rem; color: #64748B;">Rep ID</p>
+          </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="profile-stats-grid">
+          <div class="profile-stat-box">
+            <div id="statPlacesCount" class="profile-stat-number">0</div>
+            <div class="profile-stat-label">Places Logged</div>
+          </div>
+          <div class="profile-stat-box">
+            <div id="statVisitsCount" class="profile-stat-number">0</div>
+            <div class="profile-stat-label">Total Visits</div>
+          </div>
+          <div class="profile-stat-box">
+            <div id="statShiftHours" class="profile-stat-number" style="font-size: 0.85rem; padding-top: 5px;">11:00-16:00</div>
+            <div class="profile-stat-label">Shift Hours</div>
+          </div>
+        </div>
+
+        <!-- My Pinned Places Header & Search -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+          <span style="font-size: 0.82rem; font-weight: 700; color: #475569; text-transform: uppercase;">
+            Places Pinned &amp; Visited by You
+          </span>
+          <span id="myPlacesBadge" style="font-size: 0.75rem; color: #2563EB; font-weight: 700;">0 places</span>
+        </div>
+        <input type="text" id="myPlacesSearchInput" class="form-control" placeholder="Search your pinned places..." style="padding: 6px 10px; font-size: 0.85rem;">
+
+        <div id="myPinnedPlacesList" class="my-places-list">
+          <!-- Populated dynamically via MapNotesApp -->
+        </div>
+
+        <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; display: flex; justify-content: space-between; align-items: center;">
+          <button id="signOutBtn" class="btn-sm btn-outline-danger" style="padding: 8px 16px;">
+            Sign Out / Switch Rep
+          </button>
+          <button class="btn-sm btn-outline modal-close-trigger" style="padding: 8px 16px;">
+            Close
+          </button>
         </div>
       </div>
     </div>
@@ -660,13 +740,51 @@
           });
         }
 
-        // Switch Rep / Sign Out
+        // Open Sales Rep Profile Modal
         const userProfileBtn = document.getElementById('userProfileBtn');
         if (userProfileBtn) {
           userProfileBtn.addEventListener('click', () => {
+            this.openProfileModal();
+          });
+        }
+
+        // Sign Out from Profile Modal
+        const signOutBtn = document.getElementById('signOutBtn');
+        if (signOutBtn) {
+          signOutBtn.addEventListener('click', () => {
             if (confirm(`Signed in as ${window.api.currentUser.name}. Do you want to sign out or switch accounts?`)) {
               window.api.logout();
             }
+          });
+        }
+
+        // Floating Locate Me (GPS) Button
+        const locateMeBtn = document.getElementById('locateMeBtn');
+        if (locateMeBtn) {
+          locateMeBtn.addEventListener('click', () => {
+            window.mapManager.locateMe();
+          });
+        }
+
+        // Center Pin (Move Map) Mode Trigger
+        const pickCenterBtn = document.getElementById('pickCenterOnMapBtn');
+        if (pickCenterBtn) {
+          pickCenterBtn.addEventListener('click', () => {
+            document.getElementById('logVisitModal').classList.remove('active');
+            window.mapManager.setCenterCrosshairMode(true);
+            document.getElementById('confirmCenterPinBar').style.display = 'block';
+          });
+        }
+
+        // Confirm Center Pin Button
+        const confirmCenterBtn = document.getElementById('confirmCenterPinBtn');
+        if (confirmCenterBtn) {
+          confirmCenterBtn.addEventListener('click', () => {
+            document.getElementById('confirmCenterPinBar').style.display = 'none';
+            window.mapManager.setCenterCrosshairMode(false);
+            const center = window.mapManager.map.getCenter();
+            window.mapManager.setLocationForVisit(center.lat, center.lng, true);
+            document.getElementById('logVisitModal').classList.add('active');
           });
         }
 
@@ -688,6 +806,92 @@
         });
       }
 
+      openProfileModal() {
+        const user = window.api.currentUser;
+        if (!user) return;
+
+        document.getElementById('profileLargeAvatar').style.backgroundColor = user.avatarColor;
+        document.getElementById('profileLargeAvatar').textContent = user.avatarInitials;
+        document.getElementById('profileRepName').textContent = user.name;
+        document.getElementById('profilePinDisplay').textContent = `Rep ID: ${user.id.substring(0, 8)}...`;
+
+        // Filter places where user is creator OR has visited
+        const allPlaces = window.mapManager.places || [];
+        const myPlaces = allPlaces.filter(p => {
+          const isCreator = p.createdBy === user.id;
+          const hasVisited = p.visits && p.visits.some(v => v.user_id === user.id);
+          return isCreator || hasVisited;
+        });
+
+        // Calculate total visits by user
+        let userVisitsCount = 0;
+        allPlaces.forEach(p => {
+          if (p.visits) {
+            userVisitsCount += p.visits.filter(v => v.user_id === user.id).length;
+          }
+        });
+
+        document.getElementById('statPlacesCount').textContent = myPlaces.length;
+        document.getElementById('statVisitsCount').textContent = userVisitsCount;
+        document.getElementById('myPlacesBadge').textContent = `${myPlaces.length} place${myPlaces.length === 1 ? '' : 's'}`;
+
+        this.renderMyPlacesList(myPlaces);
+
+        // Search filter listener
+        const searchInput = document.getElementById('myPlacesSearchInput');
+        searchInput.value = '';
+        searchInput.oninput = (e) => {
+          const q = e.target.value.toLowerCase();
+          const filtered = myPlaces.filter(p => p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q));
+          this.renderMyPlacesList(filtered);
+        };
+
+        document.getElementById('userProfileModal').classList.add('active');
+      }
+
+      renderMyPlacesList(places) {
+        const listEl = document.getElementById('myPinnedPlacesList');
+        if (!listEl) return;
+        listEl.innerHTML = '';
+
+        if (places.length === 0) {
+          listEl.innerHTML = `
+            <div style="text-align: center; color: #94A3B8; font-size: 0.85rem; padding: 1.5rem;">
+              No places pinned or visited yet. Use <strong>"Log Visit"</strong> to drop your first pin!
+            </div>
+          `;
+          return;
+        }
+
+        places.forEach(p => {
+          const card = document.createElement('div');
+          card.className = 'my-place-card';
+          const lastDate = p.lastActivityAt ? new Date(p.lastActivityAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A';
+
+          card.innerHTML = `
+            <div>
+              <div class="my-place-title">${p.name}</div>
+              <div class="my-place-sub">
+                <span class="category-tag tag-${p.category.toLowerCase()}" style="font-size: 0.65rem; padding: 1px 5px;">${p.category}</span>
+                <span>• ${p.visitCount} visit${p.visitCount === 1 ? '' : 's'}</span>
+                <span>• Last: ${lastDate}</span>
+              </div>
+            </div>
+            <button class="btn-sm btn-outline view-on-map-btn" style="white-space: nowrap;">
+              🗺️ View
+            </button>
+          `;
+
+          card.querySelector('.view-on-map-btn').addEventListener('click', () => {
+            document.getElementById('userProfileModal').classList.remove('active');
+            window.mapManager.map.setView([p.lat, p.lng], 16, { animate: true });
+            window.mapManager.openPlaceDetails(p);
+          });
+
+          listEl.appendChild(card);
+        });
+      }
+
       openLogVisitModal() {
         const modal = document.getElementById('logVisitModal');
         modal.classList.add('active');
@@ -696,14 +900,17 @@
         if ('geolocation' in navigator) {
           navigator.geolocation.getCurrentPosition(
             (pos) => {
-              window.mapManager.setLocationForVisit(pos.coords.latitude, pos.coords.longitude);
+              window.mapManager.setLocationForVisit(pos.coords.latitude, pos.coords.longitude, true);
             },
             (err) => {
               const center = window.mapManager.map.getCenter();
-              window.mapManager.setLocationForVisit(center.lat, center.lng);
+              window.mapManager.setLocationForVisit(center.lat, center.lng, true);
             },
             { enableHighAccuracy: true, timeout: 6000 }
           );
+        } else {
+          const center = window.mapManager.map.getCenter();
+          window.mapManager.setLocationForVisit(center.lat, center.lng, true);
         }
       }
 

@@ -1,10 +1,11 @@
 /**
  * MAP NOTES - INTERACTIVE MAP & PIN MANAGER
- * 1. Shows pins for all logged places with latest visitor avatar.
- * 2. Category filters (Hotel / Medical / Restaurant / Other / All).
- * 3. 50-meter duplicate detection preview.
- * 4. Place detail history sheet with follow-up comment logging.
- * 5. Own-data deletion control (deleting last visit purges place).
+ * 1. Default starts at user's true GPS or Tashkent, Uzbekistan [41.2995, 69.2401].
+ * 2. Live pulsing user location indicator ("Blue Dot") + Floating "Locate Me" button.
+ * 3. Human-readable place & address resolution via OpenStreetMap Nominatim.
+ * 4. Dual-mode Pinning: Interactive center-screen crosshair targeting OR direct map tap.
+ * 5. 50-meter duplicate detection preview and auto-attachment.
+ * 6. Place detail history sheet with follow-up comment logging and own-data deletion.
  */
 
 class MapNotesMap {
@@ -17,14 +18,20 @@ class MapNotesMap {
     this.activeMarker = null;
 
     this.pendingLocation = null; // { lat, lng }
+    this.currentLocationMarker = null;
+    this.currentLocationAccuracyCircle = null;
+    this.isCenterCrosshairActive = false;
+    this.hasCenteredInitialGPS = false;
   }
 
   init(containerId = 'mapView') {
-    // Center initially on default coordinates (e.g., Manhattan / Chicago / London)
+    // Default center: Tashkent, Uzbekistan [41.2995, 69.2401]
+    const defaultCenter = [41.2995, 69.2401];
+
     this.map = L.map(containerId, {
       zoomControl: false,
       tap: false
-    }).setView([40.7580, -73.9855], 14);
+    }).setView(defaultCenter, 13);
 
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
 
@@ -41,15 +48,150 @@ class MapNotesMap {
       this.handleMapClick(e.latlng.lat, e.latlng.lng);
     });
 
-    // Try centering on rep's GPS location on load
+    // When panning map in center-crosshair mode, update pending coordinates dynamically
+    this.map.on('move', () => {
+      if (this.isCenterCrosshairActive) {
+        const center = this.map.getCenter();
+        this.setLocationForVisit(center.lat, center.lng, false);
+      }
+    });
+
+    // Auto-resolve real GPS position immediately on startup
+    this.requestInitialGPS();
+  }
+
+  // Request high-accuracy GPS on load
+  requestInitialGPS() {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          this.map.setView([pos.coords.latitude, pos.coords.longitude], 15);
+          const { latitude, longitude, accuracy } = pos.coords;
+          this.updateLiveUserMarker(latitude, longitude, accuracy);
+
+          // Center map directly on the user's real location!
+          if (!this.hasCenteredInitialGPS) {
+            this.map.setView([latitude, longitude], 16, { animate: true });
+            this.hasCenteredInitialGPS = true;
+          }
         },
-        (err) => console.log('Initial location lookup declined/unavailable:', err.message),
-        { enableHighAccuracy: false, timeout: 5000 }
+        (err) => {
+          console.log('[Map] GPS lookup unavailable or permission pending:', err.message);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 }
       );
+
+      // Keep watching position to update live blue dot
+      navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords;
+          this.updateLiveUserMarker(latitude, longitude, accuracy);
+        },
+        (err) => console.log('[Map] watchPosition error:', err.message),
+        { enableHighAccuracy: true, maximumAge: 5000 }
+      );
+    }
+  }
+
+  // Live Pulsing Blue Dot Marker for the user's real-time position
+  updateLiveUserMarker(lat, lng, accuracy) {
+    const liveDotIcon = L.divIcon({
+      className: 'live-user-dot-container',
+      html: `<div class="live-user-dot" title="You are here"></div>`,
+      iconSize: [22, 22],
+      iconAnchor: [11, 11]
+    });
+
+    if (this.currentLocationMarker) {
+      this.currentLocationMarker.setLatLng([lat, lng]);
+    } else {
+      this.currentLocationMarker = L.marker([lat, lng], {
+        icon: liveDotIcon,
+        zIndexOffset: 1000
+      }).addTo(this.map);
+
+      this.currentLocationMarker.bindPopup(`
+        <div style="font-family: sans-serif; font-size: 13px;">
+          <strong>📍 Your Live Location</strong><br/>
+          <span style="color: #64748B;">GPS accuracy: ±${Math.round(accuracy || 10)}m</span>
+        </div>
+      `);
+    }
+
+    // Accuracy Circle
+    if (accuracy && accuracy > 0) {
+      if (this.currentLocationAccuracyCircle) {
+        this.currentLocationAccuracyCircle.setLatLng([lat, lng]);
+        this.currentLocationAccuracyCircle.setRadius(accuracy);
+      } else {
+        this.currentLocationAccuracyCircle = L.circle([lat, lng], {
+          radius: accuracy,
+          color: '#2563EB',
+          fillColor: '#60A5FA',
+          fillOpacity: 0.12,
+          weight: 1
+        }).addTo(this.map);
+      }
+    }
+  }
+
+  // "Locate Me" button action: smooth zoom & center on user's live position
+  locateMe() {
+    if (!('geolocation' in navigator)) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude, accuracy } = pos.coords;
+        this.updateLiveUserMarker(latitude, longitude, accuracy);
+        this.map.setView([latitude, longitude], 16, { animate: true });
+
+        // If logging visit modal is open, set location to current GPS
+        const modal = document.getElementById('logVisitModal');
+        if (modal && modal.classList.contains('active')) {
+          this.setLocationForVisit(latitude, longitude, true);
+        }
+      },
+      (err) => {
+        alert('Could not determine your GPS location: ' + err.message + '\nPlease check location permissions in your browser/device settings.');
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }
+
+  // Reverse Geocode: Get human-readable street & city name via OpenStreetMap Nominatim
+  async reverseGeocode(lat, lng) {
+    const addressBox = document.getElementById('visitAddressDisplay');
+    if (!addressBox) return;
+
+    addressBox.textContent = 'Resolving street & city address...';
+
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`;
+      const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+      const data = await res.json();
+
+      if (data && data.display_name) {
+        // Build concise, readable address (Street, District, City, Country)
+        const addr = data.address || {};
+        const road = addr.road || addr.pedestrian || addr.suburb || '';
+        const city = addr.city || addr.town || addr.state || addr.country || '';
+        const readableStr = [road, city].filter(Boolean).join(', ') || data.display_name.split(',').slice(0, 3).join(',');
+
+        addressBox.innerHTML = `📍 <strong>${readableStr}</strong>`;
+
+        // Pre-fill Place Name input if currently empty
+        const nameInput = document.getElementById('visitPlaceName');
+        if (nameInput && (!nameInput.value || nameInput.value.includes('Location'))) {
+          nameInput.value = readableStr;
+        }
+      } else {
+        addressBox.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      }
+    } catch (err) {
+      console.warn('Reverse geocode error:', err);
+      addressBox.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     }
   }
 
@@ -147,14 +289,27 @@ class MapNotesMap {
   }
 
   handleMapClick(lat, lng) {
-    // Check if visit modal is in "select location on map" mode
     const modal = document.getElementById('logVisitModal');
     if (modal && modal.classList.contains('active')) {
-      this.setLocationForVisit(lat, lng);
+      this.setLocationForVisit(lat, lng, true);
     }
   }
 
-  setLocationForVisit(lat, lng) {
+  // Toggle center crosshair target mode
+  setCenterCrosshairMode(active) {
+    this.isCenterCrosshairActive = active;
+    const crosshairEl = document.getElementById('mapCenterCrosshair');
+    if (crosshairEl) {
+      crosshairEl.classList.toggle('active', active);
+    }
+
+    if (active) {
+      const center = this.map.getCenter();
+      this.setLocationForVisit(center.lat, center.lng, true);
+    }
+  }
+
+  setLocationForVisit(lat, lng, shouldReverseGeocode = true) {
     this.pendingLocation = { lat, lng };
 
     const locDisplay = document.getElementById('visitLocationDisplay');
@@ -197,6 +352,11 @@ class MapNotesMap {
       if (categorySelect) {
         categorySelect.disabled = false;
       }
+    }
+
+    // Reverse geocode street & city name
+    if (shouldReverseGeocode) {
+      this.reverseGeocode(lat, lng);
     }
   }
 

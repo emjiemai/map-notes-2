@@ -795,6 +795,213 @@ body {
 }
 
 /* ==========================================================================
+   LIVE USER LOCATION DOT & LOCATE-ME FAB
+   ========================================================================== */
+.live-user-dot {
+  width: 18px;
+  height: 18px;
+  background: #2563EB;
+  border: 3px solid #FFFFFF;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.35);
+  animation: radarPulse 2s infinite ease-out;
+}
+
+@keyframes radarPulse {
+  0% { box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.6); }
+  70% { box-shadow: 0 0 0 16px rgba(37, 99, 235, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+
+.locate-me-btn {
+  position: absolute;
+  right: 16px;
+  bottom: 90px;
+  z-index: 999;
+  width: 44px;
+  height: 44px;
+  background: #FFFFFF;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.locate-me-btn:hover {
+  background: var(--primary-light);
+  transform: scale(1.08);
+}
+
+.locate-me-btn svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+}
+
+/* Center-screen Target Pin Crosshair */
+.map-center-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  z-index: 998;
+  pointer-events: none;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+}
+
+.map-center-crosshair.active {
+  display: flex;
+  animation: dropBounce 0.3s ease-out;
+}
+
+@keyframes dropBounce {
+  0% { transform: translate(-50%, -130%); opacity: 0; }
+  100% { transform: translate(-50%, -100%); opacity: 1; }
+}
+
+.crosshair-pin-badge {
+  background: #1E293B;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  box-shadow: var(--shadow-md);
+  margin-bottom: 4px;
+}
+
+.crosshair-icon-wrap {
+  width: 36px;
+  height: 42px;
+  position: relative;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
+}
+
+/* ==========================================================================
+   USER PROFILE & MY PINNED PLACES DRAWER
+   ========================================================================== */
+.profile-summary-card {
+  background: #F8FAFC;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.profile-avatar-large {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  color: #FFFFFF;
+  font-size: 1.4rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.profile-details-wrap h4 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.profile-details-wrap p {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.profile-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.75rem;
+  margin: 0.5rem 0;
+}
+
+.profile-stat-box {
+  background: #FFFFFF;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.5rem;
+  text-align: center;
+}
+
+.profile-stat-number {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.profile-stat-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.my-places-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.my-place-card {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  background: #FFFFFF;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  transition: border-color 0.15s;
+}
+
+.my-place-card:hover {
+  border-color: var(--primary);
+}
+
+.my-place-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.my-place-sub {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.address-display-box {
+  background: #F1F5F9;
+  border: 1px solid #CBD5E1;
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ==========================================================================
    RESPONSIVE DESIGN
    ========================================================================== */
 @media (max-width: 640px) {
@@ -807,4 +1014,8 @@ body {
   .route-auditor-controls {
     grid-template-columns: 1fr;
   }
+  .profile-stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
 }
+
